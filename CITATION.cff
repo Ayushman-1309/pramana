@@ -1,1 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software in a publication, please cite it as below."
+title: "Pramana: unified cosmological inference suite"
+version: "0.1.0"
+date-released: "2026-08-14"
+type: software
+authors:
+  - name: "Ayushman-1309"
+    affiliation: "Independent researcher"
+    orcid: "0009-0001-1532-3588"
+url: "https://github.com/Ayushman-1309/pramana"
+repository-code: "https://github.com/Ayushman-1309/pramana"
+keywords:
+  - cosmology
+  - inference
+  - Bayesian
+  - MCMC
+  - Python
+abstract: |
+  Pramana is a unified cosmological inference suite for performing Bayesian parameter estimation,
+  model comparison, and forecasting in cosmology. It provides tools for likelihood evaluation,
+  sampling, and post-processing tailored to cosmological datasets.
 
+# Suggested BibTeX entry (edit as needed):
+# @software{pramana2026,
+#   author = {Ayushman-1309},
+#   title = {Pramana: unified cosmological inference suite},
+#   year = {2026},
+#   version = {0.1.0},
+#   doi = {10.5281/zenodo.XXXXXXX},
+#   url = {https://github.com/Ayushman-1309/pramana}
+# }
