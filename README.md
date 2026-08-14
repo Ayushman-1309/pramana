@@ -176,7 +176,3 @@ Key validated results:
 - Joint SN+BAO: degeneracy breaking (σ(Ωₘ): 0.100→0.013)
 
 ---
-
-## License
-
-MIT
