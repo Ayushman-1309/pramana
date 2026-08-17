@@ -2,43 +2,26 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
+import pandas as pd
 from pramana.core.models import MODEL_REGISTRY
 from pramana.core.data_io import load_pantheon, make_synthetic_dataset
 from pramana.core.gp_emulator import latin_hypercube_design, train_emulator, emulate, validate_emulator
+from pramana.web.components.data_loader import pantheon_loader
+from pramana.web.components.ui import plotly_template
 
 
 def render():
     st.title("🤖 GP Emulation")
 
-    # Data loading
-    with st.expander("📁 Data Setup", expanded='pantheon_data' not in st.session_state):
-        col1, col2 = st.columns(2)
-        with col1:
-            data_file = st.text_input("Pantheon+ data (.dat)", "data/pantheon/Pantheon+SH0ES.dat")
-        with col2:
-            cov_file = st.text_input("Covariance (.cov)", "data/pantheon/Pantheon+SH0ES_STAT+SYS.cov")
-        use_synthetic = st.checkbox("Use synthetic data", value='pantheon_data' not in st.session_state)
+    # Data loading using shared component
+    pantheon_loader(key="pantheon_data", show_instructions=False)
 
-        if st.button("Load Data"):
-            with st.spinner("Loading..."):
-                try:
-                    if use_synthetic:
-                        z, mb_obs, cov = make_synthetic_dataset()
-                        st.session_state['pantheon_data'] = {'z': z, 'mb_obs': mb_obs, 'cov': cov}
-                        st.success("Synthetic data loaded")
-                    else:
-                        z, mb_obs, cov, _ = load_pantheon(data_file, cov_file)
-                        st.session_state['pantheon_data'] = {'z': z, 'mb_obs': mb_obs, 'cov': cov}
-                        st.success(f"Loaded {len(z)} SNe")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-    if 'pantheon_data' not in st.session_state:
-        st.info("Please load data first.")
+    if "pantheon_data" not in st.session_state:
+        st.info("Please load data first using the Data Explorer or the section above.")
         return
 
-    data = st.session_state['pantheon_data']
-    z = data['z']
+    data = st.session_state["pantheon_data"]
+    z = data["z"]
 
     # Model selection
     model = st.selectbox("Model", list(MODEL_REGISTRY.keys()), format_func=lambda x: x.upper())
@@ -70,52 +53,62 @@ def render():
             theta_test = latin_hypercube_design(bounds, n_test, seed=123)
             y_test = np.array([spec["func"](z, *theta) for theta in theta_test])
             rel_err = validate_emulator(emulator, theta_test, y_test)
+            
+            # Proper calibration: compute predicted std on test points and compare to residuals
+            y_pred, y_std = emulate(emulator, theta_test, return_std=True)
+            residual = y_test - y_pred
+            calibration = np.mean(y_std / (np.abs(residual) + 1e-10))
 
-        st.session_state['emulator'] = emulator
-        st.session_state['emulator_param_names'] = param_names
-        st.session_state['emulator_z'] = z
-        st.success("Emulator trained and validated!")
+        st.session_state["emulator"] = emulator
+        st.session_state["emulator_param_names"] = param_names
+        st.session_state["emulator_z"] = z
+        st.session_state["emulator_model"] = model
+        st.session_state["emulator_bounds"] = bounds
+        
+        # Show validation results in UI
+        st.success("✅ Emulator trained and validated!")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Max rel. error", f"{rel_err.max():.2%}")
+        col2.metric("Mean rel. error", f"{rel_err.mean():.2%}")
+        col3.metric("Calibration (pred σ / |residual|)", f"{calibration:.2f}")
 
     # Prediction
-    if 'emulator' in st.session_state:
-        emulator = st.session_state['emulator']
-        param_names = st.session_state['emulator_param_names']
+    if "emulator" in st.session_state:
+        emulator = st.session_state["emulator"]
+        param_names = st.session_state["emulator_param_names"]
+        z = st.session_state["emulator_z"]
+        model = st.session_state["emulator_model"]
+        bounds = st.session_state["emulator_bounds"]
 
         st.markdown("---")
         st.subheader("Evaluate Emulator")
 
         theta_input = {}
         for p in param_names:
-            lo, hi = MODEL_REGISTRY[param_names[0]]["priors"].get(p, (0, 1)) if p in MODEL_REGISTRY else (0, 1)
-            # Use prior bounds from model registry
-            spec = MODEL_REGISTRY[list(MODEL_REGISTRY.keys())[0]]
-            if p in spec["priors"]:
-                lo, hi = spec["priors"][p]
-            else:
-                lo, hi = 0.0, 1.0
+            lo, hi = bounds[param_names.index(p)]
             theta_input[p] = st.slider(f"{p}", float(lo), float(hi), float((lo+hi)/2), key=f"emu_{p}")
 
         if st.button("Predict"):
             theta_arr = np.array([theta_input[p] for p in param_names])
             y_pred, y_std = emulate(emulator, theta_arr, return_std=True)
 
-            st.write("**Prediction (model at data points):**")
-            st.write(y_pred)
-            st.write("**Uncertainty (1σ):**")
-            st.write(y_std)
-
             # Plot prediction vs true model
-            y_true = MODEL_REGISTRY[list(MODEL_REGISTRY.keys())[0]]["func"](z, **theta_input) if list(MODEL_REGISTRY.keys())[0] == list(MODEL_REGISTRY.keys())[0] else None
-            # Actually use the selected model
             y_true = MODEL_REGISTRY[model]["func"](z, **theta_input)
 
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=z, y=y_true, mode='lines', name='True Model', line=dict(color='blue')))
-            fig.add_trace(go.Scatter(x=z, y=y_pred, mode='lines', name='GP Emulator', line=dict(color='red', dash='dash')))
-            fig.add_trace(go.Scatter(x=z, y=y_pred + y_std, mode='lines', name='+1σ', line=dict(color='red', width=0), showlegend=False))
-            fig.add_trace(go.Scatter(x=z, y=y_pred - y_std, mode='lines', name='-1σ', line=dict(color='red', width=0), fill='tonexty', fillcolor='rgba(255,0,0,0.1)', showlegend=False))
-            fig.update_layout(xaxis_title="z", yaxis_title="μ(z)", template="plotly_white", height=400)
+            fig.add_trace(go.Scatter(x=z, y=y_true, mode="lines", name="True Model", line=dict(color="#1f77b4")))
+            fig.add_trace(go.Scatter(x=z, y=y_pred, mode="lines", name="GP Emulator", line=dict(color="#ff7f0e", dash="dash")))
+            fig.add_trace(go.Scatter(x=z, y=y_pred + y_std, mode="lines", name="+1σ", line=dict(color="#ff7f0e", width=0), showlegend=False))
+            fig.add_trace(go.Scatter(x=z, y=y_pred - y_std, mode="lines", name="-1σ", line=dict(color="#ff7f0e", width=0), fill="tonexty", fillcolor="rgba(255,127,14,0.1)", showlegend=False))
+            fig.update_layout(xaxis_title="z", yaxis_title="μ(z)", template=plotly_template(), height=400)
             st.plotly_chart(fig, use_container_width=True)
+
+            # Show numeric results
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Max |y_true - y_pred|", f"{np.max(np.abs(y_true - y_pred)):.6f}")
+            with col2:
+                st.metric("Mean |y_true - y_pred|", f"{np.mean(np.abs(y_true - y_pred)):.6f}")
 
         # Speed benchmark
         if st.button("⚡ Benchmark Speed"):

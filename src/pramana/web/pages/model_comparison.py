@@ -1,42 +1,29 @@
 """PRAMANA Web UI — Model Comparison page."""
 import streamlit as st
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 from pramana.core.models import MODEL_REGISTRY
-from pramana.core.data_io import load_pantheon
 from pramana.core.mcmc import run_fit as run_mcmc
 from pramana.core.nested_sampling import run_nested, equal_weight_posterior, bayes_factor
 from pramana.core.likelihood import log_likelihood
 from pramana.core.plotting import getdist_triangle
-import emcee
+from pramana.web.components.data_loader import pantheon_loader
+from pramana.web.components.ui import plotly_template
 
 
 def render():
     st.title("⚖️ Model Comparison")
 
-    # Data loading
-    with st.expander("📁 Data Setup", expanded='pantheon_data' not in st.session_state):
-        col1, col2 = st.columns(2)
-        with col1:
-            data_file = st.text_input("Pantheon+ data (.dat)", "data/pantheon/Pantheon+SH0ES.dat")
-        with col2:
-            cov_file = st.text_input("Covariance (.cov)", "data/pantheon/Pantheon+SH0ES_STAT+SYS.cov")
+    # Data loading using shared component
+    pantheon_loader(key="pantheon_data", show_instructions=False)
 
-        if st.button("Load Data"):
-            with st.spinner("Loading..."):
-                try:
-                    z, mb_obs, cov, _ = load_pantheon(data_file, cov_file)
-                    st.session_state['pantheon_data'] = {'z': z, 'mb_obs': mb_obs, 'cov': cov}
-                    st.success(f"Loaded {len(z)} SNe")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-    if 'pantheon_data' not in st.session_state:
-        st.info("Please load data first.")
+    if "pantheon_data" not in st.session_state:
+        st.info("Please load data first using the Data Explorer or the section above.")
         return
 
-    data = st.session_state['pantheon_data']
-    z, mb_obs, cov = data['z'], data['mb_obs'], data['cov']
+    data = st.session_state["pantheon_data"]
+    z, mb_obs, cov = data["z"], data["mb_obs"], data["cov"]
     cov_inv = np.linalg.inv(cov)
 
     # Model selection
@@ -75,31 +62,33 @@ def render():
                 chains[model] = flat_chain
                 param_names_dict[model] = pnames
 
-        st.session_state['comparison_chains'] = chains
-        st.session_state['comparison_param_names'] = param_names_dict
-        st.session_state['comparison_results'] = results
-        st.session_state['comparison_method'] = method
-        st.success("Comparison complete!")
+        st.session_state["comparison_chains"] = chains
+        st.session_state["comparison_param_names"] = param_names_dict
+        st.session_state["comparison_results"] = results
+        st.session_state["comparison_method"] = method
+        st.success("✅ Comparison complete!")
 
     # Results
-    if 'comparison_chains' in st.session_state:
-        chains = st.session_state['comparison_chains']
-        param_names_dict = st.session_state['comparison_param_names']
-        results = st.session_state.get('comparison_results', {})
-        method = st.session_state['comparison_method']
+    if "comparison_chains" in st.session_state:
+        chains = st.session_state["comparison_chains"]
+        param_names_dict = st.session_state["comparison_param_names"]
+        results = st.session_state.get("comparison_results", {})
+        method = st.session_state["comparison_method"]
 
         st.markdown("---")
         st.subheader("Bayes Factors (Nested Sampling)")
         if results:
             model_names = list(results.keys())
+            bf_data = []
             for i, m1 in enumerate(model_names):
                 for m2 in model_names[i+1:]:
                     lnK, err = bayes_factor(results[m1], results[m2], m1.upper(), m2.upper())
-                    st.write(f"**{m1.upper()} vs {m2.upper()}**: ln(K) = {lnK:.2f} ± {err:.2f}")
+                    bf_data.append({"Model A": m1.upper(), "Model B": m2.upper(), "ln(K)": f"{lnK:.2f} ± {err:.2f}"})
+            if bf_data:
+                st.dataframe(pd.DataFrame(bf_data), use_container_width=True, hide_index=True)
 
         st.subheader("Posterior Comparison")
         # Triangle plot overlay
-        from pramana.core.plotting import getdist_triangle
         if st.button("Generate Triangle Plot"):
             with st.spinner("Generating triangle plot..."):
                 fig = getdist_triangle(chains, param_names_dict)
@@ -134,6 +123,6 @@ def render():
                     idx = pnames.index(p)
                     hist, bins = np.histogram(chain[:, idx], bins=50, density=True)
                     fig.add_trace(go.Bar(x=(bins[:-1]+bins[1:])/2, y=hist, name=model.upper(), opacity=0.5))
-            fig.update_layout(title=f"{p} marginal comparison", barmode='overlay',
-                              height=300, template="plotly_white")
+            fig.update_layout(title=f"{p} marginal comparison", barmode="overlay",
+                              height=300, template=plotly_template())
             st.plotly_chart(fig, use_container_width=True)

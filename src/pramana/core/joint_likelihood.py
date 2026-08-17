@@ -63,10 +63,13 @@ def build_joint_log_probability(
                     spec["func"], param_names,
                 )
             elif probe["kind"] == "bao":
-                total += log_likelihood_bao(
-                    theta, spec["e_of_z"], param_names,
-                    H0=probe.get("H0", 70.0), rd_mode=probe.get("rd_mode", "eh98"),
-                )
+                bao_kwargs = {"H0": probe.get("H0", 70.0), "rd_mode": probe.get("rd_mode", "eh98")}
+                if "labels" in probe:
+                    bao_kwargs.update({
+                        "labels": probe["labels"], "z_arr": probe["z_arr"],
+                        "data": probe["data"], "cov": probe["cov"],
+                    })
+                total += log_likelihood_bao(theta, spec["e_of_z"], param_names, **bao_kwargs)
             else:
                 raise ValueError(f"Unknown probe kind: {probe['kind']!r}")
 
@@ -98,8 +101,13 @@ def per_probe_chi2(model_name: str, theta: np.ndarray, probes: list[dict]):
                                     spec["func"], param_names)
             n_data = len(probe["z"])
         elif probe["kind"] == "bao":
-            ll = log_likelihood_bao(theta, spec["e_of_z"], param_names,
-                                     H0=probe.get("H0", 70.0), rd_mode=probe.get("rd_mode", "eh98"))
-            n_data = 13  # DESI DR2 compressed table size
+            bao_kwargs = {"H0": probe.get("H0", 70.0), "rd_mode": probe.get("rd_mode", "eh98")}
+            if "labels" in probe:
+                bao_kwargs.update({
+                    "labels": probe["labels"], "z_arr": probe["z_arr"],
+                    "data": probe["data"], "cov": probe["cov"],
+                })
+            ll = log_likelihood_bao(theta, spec["e_of_z"], param_names, **bao_kwargs)
+            n_data = len(bao_kwargs.get("data", np.arange(13)))
         print(f"  {probe['kind']}: chi2 = {-2*ll:.2f}  ({n_data} data points, "
               f"chi2/N = {-2*ll/n_data:.2f})")

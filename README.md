@@ -1,6 +1,8 @@
-# PRAMANA — Unified Cosmological Inference Suite
+# PRAMANA v2.0.0 — Unified Cosmological Inference Suite
 
 > Sanskrit *pramāṇa* (प्रमाण): a means of valid knowledge — the epistemological question of how you actually justify that something is true.
+
+**Developed by Ayushman** · [MIT License](LICENSE)
 
 A comprehensive cosmological inference toolkit spanning:
 - **SN Ia** (Pantheon+SH0ES)
@@ -176,3 +178,5 @@ Key validated results:
 - Joint SN+BAO: degeneracy breaking (σ(Ωₘ): 0.100→0.013)
 
 ---
+
+*PRAMANA v2.0.0 · Developed by Ayushman*

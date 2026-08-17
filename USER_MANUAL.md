@@ -1,7 +1,7 @@
 # PRAMANA — Unified Cosmological Inference Suite
 ## Complete User Manual
 
-> **Sanskrit *pramāṇa* (प्रमाण)**: a means of valid knowledge — the epistemological question of how you actually justify that something is true.
+> **Sanskrit *pramāṇa* (प्रमाण)**: a means of valid knowledge, the epistemological question of how you actually justify that something is true.
 
 ---
 
@@ -994,4 +994,4 @@ If you use PRAMANA in research, please cite the original PRAMANA skill methodolo
 
 ---
 
-*Last updated: 2026 | PRAMANA v0.1.0*
+*Last updated: 2026 | PRAMANA v2.0.0 · Developed by Ayushman*

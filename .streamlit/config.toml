@@ -1,0 +1,30 @@
+# PRAMANA Streamlit Theme Configuration
+# Scientific astronomy theme — desaturated, low-saturation palette
+
+[theme]
+# Base colors — deep space dark
+primaryColor = "#5FB3B3"           # Muted spectral cyan (accent)
+backgroundColor = "#0D1117"        # Near-black background
+secondaryBackgroundColor = "#161B22"  # Slightly lighter panels
+textColor = "#E6E8EB"              # Soft white text
+
+# Font
+font = "sans serif"                # Clean, modern (Inter via CSS)
+
+[server]
+headless = true
+port = 8501
+enableCORS = false
+enableXsrfProtection = false
+maxUploadSize = 200  # MB for large covariance files
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+
+[global]
+showWarningOnDirectExecution = false
+
+[logger]
+level = "info"
+messageFormat = "%(asctime)s %(levelname)s: %(message)s"

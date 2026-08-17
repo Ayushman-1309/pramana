@@ -2,46 +2,30 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
+import pandas as pd
 from pramana.core.models import MODEL_REGISTRY
 from pramana.core.data_io import load_pantheon, make_synthetic_dataset
 from pramana.core.fisher_forecast import (
     fisher_matrix_gaussian, forecast_errors, figure_of_merit,
     fisher_ellipse, compare_to_mcmc
 )
+from pramana.web.components.data_loader import pantheon_loader
+from pramana.web.components.ui import plotly_template, render_status_bar
 
 
 def render():
-    st.title("📈 Fisher Forecasting")
+    render_status_bar()
+    st.title("Fisher Forecasting")
 
-    # Data loading
-    with st.expander("📁 Data Setup", expanded='pantheon_data' not in st.session_state):
-        col1, col2 = st.columns(2)
-        with col1:
-            data_file = st.text_input("Pantheon+ data (.dat)", "data/pantheon/Pantheon+SH0ES.dat")
-        with col2:
-            cov_file = st.text_input("Covariance (.cov)", "data/pantheon/Pantheon+SH0ES_STAT+SYS.cov")
-        use_synthetic = st.checkbox("Use synthetic data", value='pantheon_data' not in st.session_state)
+    # Data loading using shared component
+    pantheon_loader(key="pantheon_data", show_instructions=False)
 
-        if st.button("Load Data"):
-            with st.spinner("Loading..."):
-                try:
-                    if use_synthetic:
-                        z, mb_obs, cov = make_synthetic_dataset()
-                        st.session_state['pantheon_data'] = {'z': z, 'mb_obs': mb_obs, 'cov': cov}
-                        st.success("Synthetic data loaded")
-                    else:
-                        z, mb_obs, cov, _ = load_pantheon(data_file, cov_file)
-                        st.session_state['pantheon_data'] = {'z': z, 'mb_obs': mb_obs, 'cov': cov}
-                        st.success(f"Loaded {len(z)} SNe")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-    if 'pantheon_data' not in st.session_state:
-        st.info("Please load data first.")
+    if "pantheon_data" not in st.session_state:
+        st.info("Please load data first using the Data Explorer or the section above.")
         return
 
-    data = st.session_state['pantheon_data']
-    z, mb_obs, cov = data['z'], data['mb_obs'], data['cov']
+    data = st.session_state["pantheon_data"]
+    z, mb_obs, cov = data["z"], data["mb_obs"], data["cov"]
     cov_inv = np.linalg.inv(cov)
 
     # Model and fiducial
@@ -68,11 +52,11 @@ def render():
             fisher = fisher_matrix_gaussian(model_predictions, theta_fid, cov_inv)
             errs, cov_mat = forecast_errors(fisher, param_names)
 
-            st.session_state['fisher'] = fisher
-            st.session_state['fisher_cov'] = cov_mat
-            st.session_state['fisher_errs'] = errs
-            st.session_state['fisher_theta_fid'] = theta_fid
-            st.session_state['fisher_param_names'] = param_names
+            st.session_state["fisher"] = fisher
+            st.session_state["fisher_cov"] = cov_mat
+            st.session_state["fisher_errs"] = errs
+            st.session_state["fisher_theta_fid"] = theta_fid
+            st.session_state["fisher_param_names"] = param_names
 
         # FoM
         if "w0" in param_names and "wa" in param_names:
@@ -81,17 +65,21 @@ def render():
             st.metric("FoM (w0-wa)", f"{fom:.2f}")
 
     # Results
-    if 'fisher' in st.session_state:
-        fisher = st.session_state['fisher']
-        cov_mat = st.session_state['fisher_cov']
-        errs = st.session_state['fisher_errs']
-        theta_fid = st.session_state['fisher_theta_fid']
-        param_names = st.session_state['fisher_param_names']
+    if "fisher" in st.session_state:
+        fisher = st.session_state["fisher"]
+        cov_mat = st.session_state["fisher_cov"]
+        errs = st.session_state["fisher_errs"]
+        theta_fid = st.session_state["fisher_theta_fid"]
+        param_names = st.session_state["fisher_param_names"]
 
         st.markdown("---")
         st.subheader("Forecast Errors")
+        
+        # Display as table
+        err_data = []
         for p in param_names:
-            st.metric(p, f"σ = {errs[p]:.4g}")
+            err_data.append({"Parameter": p, "σ (Fisher)": f"{errs[p]:.4g}"})
+        st.dataframe(pd.DataFrame(err_data), use_container_width=True, hide_index=True)
 
         # Fisher ellipse
         st.subheader("Fisher Confidence Ellipses")
@@ -107,20 +95,52 @@ def render():
                 x, y = fisher_ellipse(cov_mat, i, j, (theta_fid[i], theta_fid[j]))
 
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(x=x, y=y, mode='lines', name='1σ Fisher',
-                                         line=dict(color='red', width=2)))
+                fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name="1σ Fisher",
+                                         line=dict(color="#ff7f0e", width=2)))
                 fig.update_layout(xaxis_title=p_i, yaxis_title=p_j,
                                   title=f"Fisher 1σ Ellipse: {p_i} vs {p_j}",
-                                  template="plotly_white", height=400)
+                                  template=plotly_template(), height=400)
                 st.plotly_chart(fig, use_container_width=True)
 
         # Compare to MCMC
         st.subheader("Fisher vs MCMC Comparison")
-        mcmc_file = st.text_input("MCMC chain file (.npz) for comparison", "")
-        if mcmc_file and st.button("Compare"):
+        st.markdown("Upload an MCMC chain (.npz) to compare Fisher predictions with actual MCMC errors.")
+        
+        mcmc_file = st.file_uploader("MCMC chain file (.npz)", type=["npz"], key="fisher_mcmc_upload")
+        if mcmc_file is not None:
             try:
                 chain_data = np.load(mcmc_file)
                 mcmc_chain = chain_data["chain"]
-                compare_to_mcmc(errs, mcmc_chain, param_names)
+                # Get comparison results
+                comp_results = _compare_to_mcmc(errs, mcmc_chain, param_names)
+                
+                if comp_results:
+                    st.markdown("**Comparison Results:**")
+                    comp_data = []
+                    for name, f_err, mcmc_err, ratio in comp_results:
+                        comp_data.append({
+                            "Parameter": name,
+                            "Fisher σ": f"{f_err:.4g}",
+                            "MCMC σ": f"{mcmc_err:.4g}",
+                            "Ratio (F/M)": f"{ratio:.2f}"
+                        })
+                    st.dataframe(pd.DataFrame(comp_data), use_container_width=True, hide_index=True)
+                    
+                    # Flag non-Gaussianity
+                    for name, f_err, mcmc_err, ratio in comp_results:
+                        if ratio > 2.0:
+                            st.warning(f"⚠️ {name}: Fisher underestimates error by {ratio:.1f}× — non-Gaussian posterior!")
             except Exception as e:
                 st.error(f"Error: {e}")
+
+
+def _compare_to_mcmc(fisher_errs: dict, mcmc_chain: np.ndarray, param_names: list) -> list:
+    """Compare Fisher errors to MCMC errors, returning list of (name, f_err, mcmc_err, ratio)."""
+    results = []
+    for i, name in enumerate(param_names):
+        f_err = fisher_errs[name]
+        mcmc_err = np.percentile(mcmc_chain[:, i], 84) - np.percentile(mcmc_chain[:, i], 16)
+        mcmc_err /= 2  # convert 68% interval to 1-sigma equivalent
+        ratio = f_err / mcmc_err if mcmc_err > 0 else np.inf
+        results.append((name, f_err, mcmc_err, ratio))
+    return results

@@ -1,8 +1,8 @@
 Metadata-Version: 2.4
 Name: pramana
-Version: 0.1.0
+Version: 2.0.0
 Summary: Unified Cosmological Inference Suite — SN Ia, BAO, CMB, JWST probes with MCMC, Nested Sampling, HMC/NUTS, Fisher, SBI, GP Emulation, MOPED
-Author-email: Ayush <ayush@example.com>
+Author-email: Ayushman <ayushman@example.com>
 License: MIT
 Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Science/Research
@@ -12,6 +12,7 @@ Classifier: Topic :: Scientific/Engineering :: Astronomy
 Classifier: Topic :: Scientific/Engineering :: Physics
 Requires-Python: >=3.12
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: numpy>=2.0
 Requires-Dist: scipy>=1.13
 Requires-Dist: pandas>=2.2
@@ -48,10 +49,13 @@ Requires-Dist: camb>=1.5; extra == "all"
 Requires-Dist: cobaya>=3.3; extra == "all"
 Requires-Dist: streamlit>=1.37; extra == "all"
 Requires-Dist: plotly>=5.22; extra == "all"
+Dynamic: license-file
 
-# PRAMANA — Unified Cosmological Inference Suite
+# PRAMANA v2.0.0 — Unified Cosmological Inference Suite
 
 > Sanskrit *pramāṇa* (प्रमाण): a means of valid knowledge — the epistemological question of how you actually justify that something is true.
+
+**Developed by Ayushman** · [MIT License](LICENSE)
 
 A comprehensive cosmological inference toolkit spanning:
 - **SN Ia** (Pantheon+SH0ES)
@@ -228,6 +232,4 @@ Key validated results:
 
 ---
 
-## License
-
-MIT
+*PRAMANA v2.0.0 · Developed by Ayushman*

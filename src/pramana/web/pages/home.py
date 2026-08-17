@@ -1,9 +1,13 @@
 """PRAMANA Web UI — Home page."""
 import streamlit as st
+from pramana.web.components.ui import render_status_bar
 
 
 def render():
-    st.title("🔭 PRAMANA — Unified Cosmological Inference Suite")
+    # Status bar at top
+    render_status_bar()
+    
+    st.title("PRAMANA — Unified Cosmological Inference Suite")
     st.markdown("""
     **Sanskrit *pramāṇa* (प्रमाण)**: a means of valid knowledge — the epistemological question of
     how you actually justify that something is true.
@@ -36,19 +40,19 @@ def render():
         st.metric("Inference Methods", "9", "MCMC, Nested, NUTS, Profile, SBI, Fisher, GP, MOPED, Reweight")
 
     with col2:
-        st.markdown("### 🚀 Quick Start")
+        st.markdown("### Quick Start")
         st.code("""
 # CLI usage
-pramana fit --method mcmc --model lcdm \
+pramana fit mcmc --model lcdm \
     --sn-data data/pantheon/Pantheon+SH0ES.dat \
     --sn-cov data/pantheon/Pantheon+SH0ES_STAT+SYS.cov
 
 # Joint SN+BAO fit
-pramana joint --model cpl --sn-data ... --sn-cov ... --bao
+pramana joint fit --model cpl --sn-data ... --sn-cov ... --bao
         """, language="bash")
 
     with col3:
-        st.markdown("### 📖 Key Features")
+        st.markdown("### Key Features")
         st.markdown("""
         - **Validated pipelines** — cross-checked methods (MCMC vs NUTS, Fisher vs MCMC, etc.)
         - **Real data** — DESI DR2 BAO table built-in, Pantheon+ loaders
@@ -58,7 +62,7 @@ pramana joint --model cpl --sn-data ... --sn-cov ... --bao
         """)
 
     st.markdown("---")
-    st.markdown("### 📋 Navigation")
+    st.markdown("### Pages Reference")
     st.markdown("""
     | Page | Purpose |
     |------|---------|
@@ -68,5 +72,7 @@ pramana joint --model cpl --sn-data ... --sn-cov ... --bao
     | **Model Comparison** | Bayes factors, evidence, posterior overlays |
     | **Forecasting** | Fisher matrix + MCMC validation ellipses |
     | **Emulation** | GP training, validation, speed benchmarks |
+    | **Importance Reweighting** | Reweight chains to new priors/data |
+    | **MOPED Compression** | Optimal data compression |
     | **Tension Analysis** | H₀/S₈ whisker plots, append JWST high-z SNe |
     """)

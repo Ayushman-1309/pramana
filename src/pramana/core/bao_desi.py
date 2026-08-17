@@ -150,15 +150,26 @@ def log_likelihood_bao(
     param_names: list[str],
     H0: float = 70.0,
     rd_mode: str = "eh98",
+    labels=None,
+    z_arr=None,
+    data=None,
+    cov=None,
+    rd_fixed: float | None = None,
 ) -> float:
     """BAO log-likelihood. theta must include the E(z) shape params.
+
+    By default uses the built-in DESI DR2 reference table. To evaluate
+    against user-loaded or synthetic BAO data (from the Data Hub), pass
+    explicit labels/z_arr/data/cov — same format as
+    build_data_vector_and_cov().
 
     If rd_mode == 'free', theta's last entry is rd (Mpc) sampled directly.
     If rd_mode == 'eh98', rd is computed from Om, H0 via the fitting formula.
     If rd_mode == 'planck_prior', a fixed Planck-anchored rd is used
     (pass rd_fixed via functools.partial when wiring into an MCMC).
     """
-    labels, z_arr, data, cov = build_data_vector_and_cov()
+    if labels is None or z_arr is None or data is None or cov is None:
+        labels, z_arr, data, cov = build_data_vector_and_cov()
     cov_inv = np.linalg.inv(cov)
 
     params = dict(zip(param_names, theta))
@@ -167,6 +178,8 @@ def log_likelihood_bao(
 
     if rd_mode == "free":
         rd = params["rd"]
+    elif rd_mode == "planck_prior" and rd_fixed is not None:
+        rd = rd_fixed
     else:
         rd = sound_horizon_rd(Om, H0)
 

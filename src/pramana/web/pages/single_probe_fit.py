@@ -11,40 +11,23 @@ from pramana.core.nested_sampling import run_nested, equal_weight_posterior
 from pramana.core.profile_likelihood import profile_scan, confidence_interval_from_profile
 from pramana.core.likelihood import log_likelihood
 from pramana.core.hmc_numpyro import build_sn_model, run_nuts, samples_to_flat_chain
+from pramana.core.sbi_inference import make_simulator, train_npe, sample_posterior
+from pramana.web.components.data_loader import pantheon_loader
+from pramana.web.components.ui import plotly_template
 
 
 def render():
     st.title("🎯 Single-Probe Fit")
 
-    # Data loading section
-    with st.expander("📁 Data Setup", expanded='pantheon_data' not in st.session_state):
-        col1, col2 = st.columns(2)
-        with col1:
-            data_file = st.text_input("Pantheon+ data (.dat)", "data/pantheon/Pantheon+SH0ES.dat")
-        with col2:
-            cov_file = st.text_input("Covariance (.cov)", "data/pantheon/Pantheon+SH0ES_STAT+SYS.cov")
-        use_synthetic = st.checkbox("Use synthetic data", value='pantheon_data' not in st.session_state)
+    # Data loading using shared component
+    pantheon_loader(key="pantheon_data", show_instructions=True)
 
-        if st.button("Load Data"):
-            with st.spinner("Loading..."):
-                try:
-                    if use_synthetic:
-                        z, mb_obs, cov = make_synthetic_dataset()
-                        st.session_state['pantheon_data'] = {'z': z, 'mb_obs': mb_obs, 'cov': cov}
-                        st.success("Synthetic data loaded")
-                    else:
-                        z, mb_obs, cov, _ = load_pantheon(data_file, cov_file)
-                        st.session_state['pantheon_data'] = {'z': z, 'mb_obs': mb_obs, 'cov': cov}
-                        st.success(f"Loaded {len(z)} SNe")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-    if 'pantheon_data' not in st.session_state:
-        st.info("Please load data first.")
+    if "pantheon_data" not in st.session_state:
+        st.info("Please load data first using the section above.")
         return
 
-    data = st.session_state['pantheon_data']
-    z, mb_obs, cov = data['z'], data['mb_obs'], data['cov']
+    data = st.session_state["pantheon_data"]
+    z, mb_obs, cov = data["z"], data["mb_obs"], data["cov"]
 
     # Model and method selection
     col1, col2, col3 = st.columns(3)
@@ -52,8 +35,11 @@ def render():
         model = st.selectbox("Model", list(MODEL_REGISTRY.keys()),
                              format_func=lambda x: x.upper())
     with col2:
-        method = st.selectbox("Method", ["MCMC (emcee)", "Nested Sampling (dynesty)",
-                                          "NUTS/HMC (numpyro)", "Profile Likelihood"])
+        method = st.selectbox("Method", [
+            "MCMC (emcee)", "Nested Sampling (dynesty)",
+            "NUTS/HMC (numpyro)", "Profile Likelihood",
+            "SBI (Neural Posterior Estimation)"
+        ])
     with col3:
         n_walkers = st.number_input("Walkers / Live points", 16, 200, 32)
 
@@ -77,13 +63,16 @@ def render():
         n_steps = st.slider("MCMC steps", 1000, 50000, 4000, step=1000)
         run_btn = st.button("🚀 Run MCMC", type="primary")
         if run_btn:
+            progress_bar = st.progress(0, text="Running MCMC...")
             with st.spinner("Running MCMC..."):
                 sampler = run_mcmc(model, z, mb_obs, cov, nwalkers=n_walkers, nsteps=n_steps)
+                # Note: emcee doesn't support easy progress callbacks in this version
+                progress_bar.progress(1.0, text="MCMC complete!")
                 burn_in = int(n_steps * 0.3)
                 flat_chain = sampler.get_chain(discard=burn_in, flat=True)
-                st.session_state['last_chain'] = flat_chain
-                st.session_state['last_model'] = model
-                st.success(f"Done! {flat_chain.shape[0]} samples")
+                st.session_state["last_chain"] = flat_chain
+                st.session_state["last_model"] = model
+                st.success(f"✅ Done! {flat_chain.shape[0]} samples")
 
     elif method == "Nested Sampling (dynesty)":
         n_live = st.slider("Live points", 100, 2000, n_walkers)
@@ -95,9 +84,9 @@ def render():
                     return log_likelihood(theta, z, mb_obs, cov_inv, spec["func"], param_names)
                 results = run_nested(loglike, param_names, priors, nlive=n_live)
                 posterior = equal_weight_posterior(results)
-                st.session_state['last_chain'] = posterior
-                st.session_state['last_model'] = model
-                st.success(f"Done! ln(Z) = {results.logz[-1]:.2f} ± {results.logzerr[-1]:.2f}")
+                st.session_state["last_chain"] = posterior
+                st.session_state["last_model"] = model
+                st.success(f"✅ Done! ln(Z) = {results.logz[-1]:.2f} ± {results.logzerr[-1]:.2f}")
 
     elif method == "NUTS/HMC (numpyro)":
         col1, col2 = st.columns(2)
@@ -113,9 +102,9 @@ def render():
                 model_numpyro, pnames = build_sn_model(z, mb_obs, cov_inv, model, priors)
                 mcmc = run_nuts(model_numpyro, num_warmup=n_warmup, num_samples=n_samples, num_chains=n_chains)
                 flat_chain = samples_to_flat_chain(mcmc, pnames)
-                st.session_state['last_chain'] = flat_chain
-                st.session_state['last_model'] = model
-                st.success(f"Done! {flat_chain.shape[0]} samples")
+                st.session_state["last_chain"] = flat_chain
+                st.session_state["last_model"] = model
+                st.success(f"✅ Done! {flat_chain.shape[0]} samples")
 
     elif method == "Profile Likelihood":
         param_of_interest = st.selectbox("Parameter to profile", param_names)
@@ -130,16 +119,36 @@ def render():
                 scan_vals = np.linspace(bounds[param_of_interest][0], bounds[param_of_interest][1], n_points)
                 scan_vals, profile_nll, _ = profile_scan(neg_log_likelihood, param_names, param_of_interest, scan_vals, bounds)
                 best, lo, hi = confidence_interval_from_profile(scan_vals, profile_nll)
-                st.session_state['profile_result'] = {
-                    'scan_vals': scan_vals, 'profile_nll': profile_nll,
-                    'param': param_of_interest, 'best': best, 'lo': lo, 'hi': hi
+                st.session_state["profile_result"] = {
+                    "scan_vals": scan_vals, "profile_nll": profile_nll,
+                    "param": param_of_interest, "best": best, "lo": lo, "hi": hi
                 }
                 st.success(f"Best {param_of_interest} = {best:.4f}, 68% CI: [{lo:.4f}, {hi:.4f}]")
 
+    elif method == "SBI (Neural Posterior Estimation)":
+        n_sims = st.number_input("Training simulations", 500, 50000, 2000, step=500)
+        n_post_samples = st.number_input("Posterior samples", 100, 20000, 5000, step=500)
+        run_btn = st.button("🚀 Train & Sample SBI", type="primary")
+        if run_btn:
+            with st.spinner("Building simulator..."):
+                # mb_err = sqrt of diagonal of covariance (per-SN magnitude error)
+                mb_err = np.sqrt(np.diag(cov))
+                simulator = make_simulator(spec["func"], z, mb_err)
+            with st.spinner(f"Training NPE with {n_sims} simulations..."):
+                posterior = train_npe(simulator, priors, param_names, n_simulations=n_sims)
+            with st.spinner(f"Sampling {n_post_samples} posterior samples..."):
+                # Use fiducial for observed data
+                theta_fid = np.array([np.mean(priors[p]) for p in param_names])
+                x_o = simulator(theta_fid)
+                post_samples = sample_posterior(posterior, x_o, n_samples=n_post_samples)
+                st.session_state["last_chain"] = post_samples
+                st.session_state["last_model"] = model
+                st.success(f"✅ Done! {post_samples.shape[0]} posterior samples")
+
     # Results display
-    if 'last_chain' in st.session_state:
-        chain = st.session_state['last_chain']
-        model_name = st.session_state['last_model']
+    if "last_chain" in st.session_state:
+        chain = st.session_state["last_chain"]
+        model_name = st.session_state["last_model"]
         spec = MODEL_REGISTRY[model_name]
 
         st.markdown("---")
@@ -164,17 +173,17 @@ def render():
             fig = go.Figure()
             hist, bins = np.histogram(chain[:, i], bins=50, density=True)
             fig.add_trace(go.Bar(x=(bins[:-1]+bins[1:])/2, y=hist, name=p, opacity=0.7))
-            fig.update_layout(title=f"{p} marginal", height=200, showlegend=False, template="plotly_white")
+            fig.update_layout(title=f"{p} marginal", height=200, showlegend=False, template=plotly_template())
             st.plotly_chart(fig, use_container_width=True)
 
-    if 'profile_result' in st.session_state:
-        res = st.session_state['profile_result']
+    if "profile_result" in st.session_state:
+        res = st.session_state["profile_result"]
         st.markdown("---")
         st.subheader(f"Profile Likelihood: {res['param']}")
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=res['scan_vals'], y=res['profile_nll'], mode='lines', name='Profile'))
-        fig.add_vline(x=res['best'], line_dash="dash", line_color="red", annotation_text=f"Best: {res['best']:.4f}")
-        fig.add_vline(x=res['lo'], line_dash="dot", line_color="orange", annotation_text=f"68% CI")
-        fig.add_vline(x=res['hi'], line_dash="dot", line_color="orange")
-        fig.update_layout(xaxis_title=res['param'], yaxis_title="-log L", template="plotly_white")
+        fig.add_trace(go.Scatter(x=res["scan_vals"], y=res["profile_nll"], mode="lines", name="Profile"))
+        fig.add_vline(x=res["best"], line_dash="dash", line_color="red", annotation_text=f"Best: {res['best']:.4f}")
+        fig.add_vline(x=res["lo"], line_dash="dot", line_color="orange", annotation_text="68% CI")
+        fig.add_vline(x=res["hi"], line_dash="dot", line_color="orange")
+        fig.update_layout(xaxis_title=res["param"], yaxis_title="-log L", template=plotly_template())
         st.plotly_chart(fig, use_container_width=True)

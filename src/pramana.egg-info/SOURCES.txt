@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 src/pramana/__init__.py
@@ -45,13 +46,17 @@ src/pramana/utils/validators.py
 src/pramana/web/__init__.py
 src/pramana/web/app.py
 src/pramana/web/components/__init__.py
+src/pramana/web/components/data_loader.py
+src/pramana/web/components/ui.py
 src/pramana/web/pages/__init__.py
+src/pramana/web/pages/compression.py
 src/pramana/web/pages/data_explorer.py
 src/pramana/web/pages/emulation.py
 src/pramana/web/pages/forecasting.py
 src/pramana/web/pages/home.py
 src/pramana/web/pages/joint_fit.py
 src/pramana/web/pages/model_comparison.py
+src/pramana/web/pages/reweighting.py
 src/pramana/web/pages/single_probe_fit.py
 src/pramana/web/pages/tension_analysis.py
 tests/test_validation.py

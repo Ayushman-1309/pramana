@@ -3,38 +3,26 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 from pramana.core.models import MODEL_REGISTRY
-from pramana.core.data_io import load_pantheon
 from pramana.core.joint_likelihood import build_joint_log_probability, per_probe_chi2
 from pramana.core.mcmc import run_fit as run_mcmc
 import emcee
+from pramana.web.components.data_loader import pantheon_loader
+from pramana.web.components.ui import plotly_template, render_status_bar
 
 
 def render():
-    st.title("🔗 Joint Multi-Probe Fit")
+    render_status_bar()
+    st.title("Joint Multi-Probe Fit")
 
-    # Data loading
-    with st.expander("📁 Data Setup", expanded='pantheon_data' not in st.session_state):
-        col1, col2 = st.columns(2)
-        with col1:
-            data_file = st.text_input("Pantheon+ data (.dat)", "data/pantheon/Pantheon+SH0ES.dat")
-        with col2:
-            cov_file = st.text_input("Covariance (.cov)", "data/pantheon/Pantheon+SH0ES_STAT+SYS.cov")
+    # Data loading using shared component
+    pantheon_loader(key="pantheon_data", show_instructions=False)
 
-        if st.button("Load SN Data"):
-            with st.spinner("Loading..."):
-                try:
-                    z, mb_obs, cov, _ = load_pantheon(data_file, cov_file)
-                    st.session_state['pantheon_data'] = {'z': z, 'mb_obs': mb_obs, 'cov': cov}
-                    st.success(f"Loaded {len(z)} SNe")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-    if 'pantheon_data' not in st.session_state:
-        st.info("Please load SN data first.")
+    if "pantheon_data" not in st.session_state:
+        st.info("Please load SN data first using the Data Explorer or the section above.")
         return
 
-    data = st.session_state['pantheon_data']
-    z, mb_obs, cov = data['z'], data['mb_obs'], data['cov']
+    data = st.session_state["pantheon_data"]
+    z, mb_obs, cov = data["z"], data["mb_obs"], data["cov"]
 
     # Probe selection
     st.subheader("Probe Selection")
@@ -44,7 +32,16 @@ def render():
     with col2:
         use_bao = st.checkbox("BAO (DESI DR2)", value=True)
     with col3:
-        use_cmb = st.checkbox("CMB (ACT DR6)", value=False, disabled=True, help="Requires ACT data download")
+        cmb_ready = "cmb_data" in st.session_state
+        use_cmb = st.checkbox("CMB (ACT DR6)", value=False,
+                              disabled=not cmb_ready,
+                              help="Load/generate CMB data in the Data Hub first (ACT DR6)")
+
+    if use_bao and "bao_data" not in st.session_state:
+        st.info("Load or generate BAO data in the **Data Hub** to use it in the joint fit. "
+                "Using built-in DESI DR2 reference table for now.")
+    if use_cmb and not cmb_ready:
+        st.info("CMB requires ACT DR6 data — load or generate it in the **Data Hub**.")
 
     # Model selection
     model = st.selectbox("Model", list(MODEL_REGISTRY.keys()), format_func=lambda x: x.upper())
@@ -71,7 +68,18 @@ def render():
         if use_sn:
             probes.append({"kind": "sn", "z": z, "mb_obs": mb_obs, "cov_inv": np.linalg.inv(cov)})
         if use_bao:
-            probes.append({"kind": "bao", "H0": bao_H0, "rd_mode": rd_mode})
+            bao_probe = {"kind": "bao", "H0": bao_H0, "rd_mode": rd_mode}
+            if "bao_data" in st.session_state:
+                bd = st.session_state["bao_data"]
+                bao_probe.update({
+                    "labels": bd["labels"], "z_arr": bd["z_arr"],
+                    "data": bd["data"], "cov": bd["cov"],
+                })
+            probes.append(bao_probe)
+        if use_cmb:
+            st.warning("CMB joint fitting requires the ACT DR6 likelihood packages "
+                       "(act_dr6_lenslike / cobaya) which are not installed — "
+                       "CMB probe skipped for this run.")
 
         log_prob, pnames = build_joint_log_probability(model, probes, priors)
         ndim = len(pnames)
@@ -88,18 +96,18 @@ def render():
             burn_in = int(nsteps * 0.3)
             flat_chain = sampler.get_chain(discard=burn_in, flat=True)
 
-            st.session_state['joint_chain'] = flat_chain
-            st.session_state['joint_model'] = model
-            st.session_state['joint_probes'] = probes
-            st.session_state['joint_param_names'] = pnames
-            st.success(f"Done! {flat_chain.shape[0]} samples")
+            st.session_state["joint_chain"] = flat_chain
+            st.session_state["joint_model"] = model
+            st.session_state["joint_probes"] = probes
+            st.session_state["joint_param_names"] = pnames
+            st.success(f"✅ Done! {flat_chain.shape[0]} samples")
 
     # Results
-    if 'joint_chain' in st.session_state:
-        chain = st.session_state['joint_chain']
-        model_name = st.session_state['joint_model']
-        probes = st.session_state['joint_probes']
-        pnames = st.session_state['joint_param_names']
+    if "joint_chain" in st.session_state:
+        chain = st.session_state["joint_chain"]
+        model_name = st.session_state["joint_model"]
+        probes = st.session_state["joint_probes"]
+        pnames = st.session_state["joint_param_names"]
         spec = MODEL_REGISTRY[model_name]
 
         st.markdown("---")
@@ -115,7 +123,12 @@ def render():
         # Per-probe chi2
         if st.button("Show Per-Probe χ²"):
             best = np.median(chain, axis=0)
-            per_probe_chi2(model_name, best, probes)
+            # Get per-probe chi2
+            chi2_results = _get_per_probe_chi2(model_name, best, probes)
+            if chi2_results:
+                st.subheader("Per-Probe χ² Breakdown")
+                for probe_name, chi2_val, n_data in chi2_results:
+                    st.metric(probe_name, f"χ² = {chi2_val:.2f}", f"{n_data} data points")
 
         # Corner plot
         if st.button("Generate Corner Plot"):
@@ -130,5 +143,38 @@ def render():
             fig = go.Figure()
             hist, bins = np.histogram(chain[:, i], bins=50, density=True)
             fig.add_trace(go.Bar(x=(bins[:-1]+bins[1:])/2, y=hist, name=p, opacity=0.7))
-            fig.update_layout(title=f"{p} marginal", height=200, showlegend=False, template="plotly_white")
+            fig.update_layout(title=f"{p} marginal", height=200, showlegend=False, template=plotly_template())
             st.plotly_chart(fig, use_container_width=True)
+
+
+def _get_per_probe_chi2(model_name: str, theta: np.ndarray, probes: list[dict]) -> list[tuple[str, float, int]]:
+    """Get per-probe chi2 values as a list of (name, chi2, n_data)."""
+    from pramana.core.models import MODEL_REGISTRY
+    from pramana.core.likelihood import log_likelihood as sn_log_likelihood
+    from pramana.core.bao_desi import log_likelihood_bao
+    import numpy as np
+    
+    spec = MODEL_REGISTRY[model_name]
+    param_names = spec["params"]
+    
+    results = []
+    for probe in probes:
+        if probe["kind"] == "sn":
+            ll = sn_log_likelihood(theta, probe["z"], probe["mb_obs"], probe["cov_inv"], spec["func"], param_names)
+            n_data = len(probe["z"])
+            name = "SN (Pantheon+)"
+        elif probe["kind"] == "bao":
+            bao_kwargs = {"H0": probe.get("H0", 70.0), "rd_mode": probe.get("rd_mode", "eh98")}
+            if "labels" in probe:
+                bao_kwargs.update({
+                    "labels": probe["labels"], "z_arr": probe["z_arr"],
+                    "data": probe["data"], "cov": probe["cov"],
+                })
+            ll = log_likelihood_bao(theta, spec["e_of_z"], param_names, **bao_kwargs)
+            n_data = len(bao_kwargs.get("data", np.arange(13)))
+            name = f"BAO (DESI DR2, rd={probe.get('rd_mode', 'eh98')})"
+        else:
+            continue
+        chi2 = -2 * ll
+        results.append((name, chi2, n_data))
+    return results
