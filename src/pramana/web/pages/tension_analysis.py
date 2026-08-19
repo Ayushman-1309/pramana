@@ -11,7 +11,7 @@ from pramana.core.jwst_probes import (
 )
 from pramana.web.components.data_loader import pantheon_loader
 from pramana.web.components.data_hub import dataset_loader
-from pramana.web.components.ui import plotly_template, render_status_bar
+from pramana.web.components.ui import plotly_template, render_status_bar, plot_export_controls, export_downloads
 
 
 def _hub_h0_table():
@@ -46,7 +46,9 @@ def render():
         h0_data = []
         for name, d in h0_table.items():
             h0_data.append({"Measurement": name, "H₀": d["H0"], "Error": d["err"], "Family": d["family"]})
-        st.dataframe(pd.DataFrame(h0_data), use_container_width=True, hide_index=True)
+        h0_df = pd.DataFrame(h0_data)
+        st.dataframe(h0_df, use_container_width=True, hide_index=True)
+        export_downloads(h0_df, "tension_H0_measurements")
 
         # Tension calculator
         col1, col2 = st.columns(2)
@@ -75,6 +77,7 @@ def render():
                            ticktext=list(h0_table.keys())),
                 xaxis_title="H₀ [km/s/Mpc]", height=400, template=plotly_template()
             )
+            plot_export_controls(fig, "tension_H0_whisker")
             st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
@@ -83,7 +86,9 @@ def render():
         s8_data = []
         for name, d in s8_table.items():
             s8_data.append({"Measurement": name, "S₈": d["S8"], "Error": d["err"], "Family": d["family"]})
-        st.dataframe(pd.DataFrame(s8_data), use_container_width=True, hide_index=True)
+        s8_df = pd.DataFrame(s8_data)
+        st.dataframe(s8_df, use_container_width=True, hide_index=True)
+        export_downloads(s8_df, "tension_S8_measurements")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -110,6 +115,7 @@ def render():
                            ticktext=list(s8_table.keys())),
                 xaxis_title="S₈ = σ₈√(Ωₘ/0.3)", height=400, template=plotly_template()
             )
+            plot_export_controls(fig, "tension_S8_whisker")
             st.plotly_chart(fig, use_container_width=True)
 
     with tab3:
@@ -163,7 +169,12 @@ def render():
                                              marker=dict(size=8, color="#ff7f0e"), name="New (JWST)",
                                              error_y=dict(type="data", array=mb_err_new, visible=True)))
                     fig.update_layout(xaxis_title="z", yaxis_title="m_b,corr", template=plotly_template(), height=400)
+                    plot_export_controls(fig, "tension_appended_hubble_diagram")
                     st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Export appended SNe data
+                    appended_df = pd.DataFrame({"z": z_new, "mb": mb_new, "err": mb_err_new})
+                    export_downloads(appended_df, "tension_appended_SNe")
 
                 except Exception as e:
                     st.error(f"Error: {e}")

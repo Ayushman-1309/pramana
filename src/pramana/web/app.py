@@ -2,14 +2,14 @@
 import streamlit as st
 
 st.set_page_config(
-    page_title="PRAMANA — Cosmological Inference Suite",
+    page_title="PRAMANA — The Unified Cosmological Inference Suite",
     page_icon="🔭",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # Import UI helpers
-from pramana.web.components.ui import inject_global_css, VERSION, DEVELOPER
+from pramana.web.components.ui import inject_global_css, VERSION, DEVELOPER, SUITE_NAME
 
 # Import all page render functions
 from pramana.web.pages import (
@@ -23,6 +23,7 @@ from pramana.web.pages import (
     reweighting,
     compression,
     tension_analysis,
+    about,
 )
 
 # Inject global CSS (fonts, theme, components)
@@ -91,11 +92,17 @@ pages = {
         icon=":material/warning:",
         url_path="tension-analysis",
     ),
+    "About": st.Page(
+        about.render,
+        title="About",
+        icon=":material/info:",
+        url_path="about",
+    ),
 }
 
 # Build navigation
 pg = st.navigation({
-    "PRAMANA": [
+    "PRAMANA-UCIS": [
         pages["Home"],
         pages["Data Explorer"],
         pages["Single-Probe Fit"],
@@ -111,10 +118,24 @@ pg = st.navigation({
     "Tension": [
         pages["Tension Analysis"],
     ],
+    "About": [
+        pages["About"],
+    ],
 })
 pg.run()
 
-# ─── Sidebar Quick Actions (always visible) ───
+# ─── Sidebar: PRAMANA-UCIS wordmark + Quick Actions ───
+st.sidebar.markdown(f"""
+<div style="text-align:center; padding:1rem 0.5rem; border-bottom:1px solid var(--pr-border); margin-bottom:0.5rem;">
+    <div style="font-family:'Source Serif 4',Georgia,serif; font-size:1.25rem; font-weight:600; color:var(--pr-primary);">
+        PRAMANA-UCIS
+    </div>
+    <div style="font-family:'Inter',sans-serif; font-size:0.7rem; color:var(--pr-text-muted); margin-top:0.25rem;">
+        Unified Cosmological Inference Suite
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Quick Actions**")
 if st.sidebar.button("🔄 Clear Cache", use_container_width=True):

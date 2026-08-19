@@ -1,7 +1,7 @@
 """PRAMANA Web UI — Data Hub (Data Explorer).
 
-Every PRAMANA dataset family (SN Ia, BAO, CMB, JWST-era) is loaded here
-with two options: manual download (official links + upload/path) and
+Every PRAMANA dataset family (SN Ia, BAO, CMB, JWST-era, Weak Lensing) is loaded here
+with three options: manual download (official links + upload/path) and
 synthetic generation. NO real data is bundled with the app — nothing is
 loaded until you download it or generate a synthetic version.
 """
@@ -30,18 +30,21 @@ def render():
     """)
 
     # A compact status overview
-    col1, col2, col3, col4 = st.columns(4)
-    for col, fam in zip([col1, col2, col3, col4], ["pantheon", "bao", "cmb", "jwst"]):
+    col1, col2, col3, col4, col5 = st.columns(5)
+    for col, fam in zip([col1, col2, col3, col4, col5], 
+                        ["pantheon", "bao", "cmb", "jwst", "weak_lensing"]):
         key = {
             "pantheon": "pantheon_data",
             "bao": "bao_data",
             "cmb": "cmb_data",
             "jwst": "jwst_data",
+            "weak_lensing": "shear_data",
         }[fam]
         loaded = key in st.session_state
         src = st.session_state[key].get("source", "?") if loaded else ""
         tag = "✅" if loaded else "—"
-        label = {"pantheon": "SN Ia", "bao": "BAO", "cmb": "CMB", "jwst": "JWST"}[fam]
+        label = {"pantheon": "SN Ia", "bao": "BAO", "cmb": "CMB", 
+                 "jwst": "JWST", "weak_lensing": "WL"}[fam]
         col.metric(label, tag, f"{src}" if loaded else "not loaded")
 
     st.markdown("---")
@@ -61,3 +64,7 @@ def render():
     # --- JWST-era ---
     dataset_loader("jwst", key="jwst_data", show_instructions=False)
     render_family_summary("jwst", key="jwst_data")
+
+    # --- Weak Lensing ---
+    dataset_loader("weak_lensing", key="shear_data", show_instructions=False)
+    render_family_summary("weak_lensing", key="shear_data")

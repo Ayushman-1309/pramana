@@ -58,9 +58,9 @@ def data_pantheon(
 @data_app.command("desi")
 def data_desi(
     show_table: bool = typer.Option(True, "--table/--no-table", help="Show DESI DR2 BAO table"),
-    validate: bool = typer.Option(False, "--validate", help="Validate built-in table"),
+    validate: bool = typer.Option(False, "--validate", help="Validate reference table"),
 ):
-    """Explore DESI DR2 BAO data (built-in)."""
+    """Explore DESI DR2 BAO data (reference table)."""
     if show_table:
         table = Table(title="DESI DR2 BAO Measurements")
         table.add_column("Tracer", style="cyan")

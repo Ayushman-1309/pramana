@@ -2,12 +2,13 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
+import pandas as pd
 from pramana.core.models import MODEL_REGISTRY
 from pramana.core.joint_likelihood import build_joint_log_probability, per_probe_chi2
 from pramana.core.mcmc import run_fit as run_mcmc
 import emcee
 from pramana.web.components.data_loader import pantheon_loader
-from pramana.web.components.ui import plotly_template, render_status_bar
+from pramana.web.components.ui import plotly_template, render_status_bar, plot_export_controls, export_downloads
 
 
 def render():
@@ -39,7 +40,7 @@ def render():
 
     if use_bao and "bao_data" not in st.session_state:
         st.info("Load or generate BAO data in the **Data Hub** to use it in the joint fit. "
-                "Using built-in DESI DR2 reference table for now.")
+                "The shipped DESI DR2 reference table will be used as fallback.")
     if use_cmb and not cmb_ready:
         st.info("CMB requires ACT DR6 data — load or generate it in the **Data Hub**.")
 
@@ -120,6 +121,10 @@ def render():
             lo, hi = np.percentile(chain[:, i], [16, 84])
             cols[i].metric(p, f"{med:.4f}", f"+{hi-med:.4f}/-{med-lo:.4f}")
 
+        # Export chain
+        chain_df = pd.DataFrame(chain, columns=pnames)
+        export_downloads(chain_df, f"joint_chain_{model_name}")
+
         # Per-probe chi2
         if st.button("Show Per-Probe χ²"):
             best = np.median(chain, axis=0)
@@ -129,6 +134,8 @@ def render():
                 st.subheader("Per-Probe χ² Breakdown")
                 for probe_name, chi2_val, n_data in chi2_results:
                     st.metric(probe_name, f"χ² = {chi2_val:.2f}", f"{n_data} data points")
+                chi2_df = pd.DataFrame(chi2_results, columns=["Probe", "χ²", "N_data"])
+                export_downloads(chi2_df, f"joint_chi2_{model_name}")
 
         # Corner plot
         if st.button("Generate Corner Plot"):
@@ -144,6 +151,7 @@ def render():
             hist, bins = np.histogram(chain[:, i], bins=50, density=True)
             fig.add_trace(go.Bar(x=(bins[:-1]+bins[1:])/2, y=hist, name=p, opacity=0.7))
             fig.update_layout(title=f"{p} marginal", height=200, showlegend=False, template=plotly_template())
+            plot_export_controls(fig, f"joint_marginal_{p}_{model_name}")
             st.plotly_chart(fig, use_container_width=True)
 
 

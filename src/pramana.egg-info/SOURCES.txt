@@ -39,6 +39,8 @@ src/pramana/core/nested_sampling.py
 src/pramana/core/plotting.py
 src/pramana/core/profile_likelihood.py
 src/pramana/core/sbi_inference.py
+src/pramana/core/synthetic.py
+src/pramana/core/weak_lensing.py
 src/pramana/utils/__init__.py
 src/pramana/utils/jax_config.py
 src/pramana/utils/optional_imports.py
@@ -46,9 +48,11 @@ src/pramana/utils/validators.py
 src/pramana/web/__init__.py
 src/pramana/web/app.py
 src/pramana/web/components/__init__.py
+src/pramana/web/components/data_hub.py
 src/pramana/web/components/data_loader.py
 src/pramana/web/components/ui.py
 src/pramana/web/pages/__init__.py
+src/pramana/web/pages/about.py
 src/pramana/web/pages/compression.py
 src/pramana/web/pages/data_explorer.py
 src/pramana/web/pages/emulation.py

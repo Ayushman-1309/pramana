@@ -158,7 +158,7 @@ def log_likelihood_bao(
 ) -> float:
     """BAO log-likelihood. theta must include the E(z) shape params.
 
-    By default uses the built-in DESI DR2 reference table. To evaluate
+    By default uses the shipped DESI DR2 reference table. To evaluate
     against user-loaded or synthetic BAO data (from the Data Hub), pass
     explicit labels/z_arr/data/cov — same format as
     build_data_vector_and_cov().

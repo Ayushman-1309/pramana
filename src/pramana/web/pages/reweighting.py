@@ -9,7 +9,7 @@ from pramana.core.importance_resampling import (
     weighted_quantiles, resample_to_equal_weight
 )
 from pramana.web.components.data_loader import pantheon_loader
-from pramana.web.components.ui import plotly_template, render_status_bar
+from pramana.web.components.ui import plotly_template, render_status_bar, plot_export_controls, export_downloads
 
 
 def render():
@@ -174,6 +174,7 @@ def render():
             chain_display = chain  # show weighted percentiles
 
         st.subheader("Parameter Constraints (Weighted)")
+        constraint_rows = []
         for i, p in enumerate(param_names):
             if "reweight_resampled" in st.session_state:
                 med = np.median(chain_display[:, i])
@@ -183,6 +184,10 @@ def render():
                 lo = weighted_quantiles(chain_display[:, i], weights, (0.16, 0.5, 0.84))[0]
                 hi = weighted_quantiles(chain_display[:, i], weights, (0.16, 0.5, 0.84))[2]
             st.metric(p, f"{med:.4f}", f"+{hi-med:.4f}/-{med-lo:.4f}")
+            constraint_rows.append({"Parameter": p, "Median": f"{med:.4f}", "Lower": f"{lo:.4f}", "Upper": f"{hi:.4f}"})
+        
+        if constraint_rows:
+            export_downloads(pd.DataFrame(constraint_rows), f"reweight_constraints_{model}")
 
         # Corner plot
         if st.button("Generate Corner Plot"):
@@ -206,4 +211,11 @@ def render():
                 hist, bins = np.histogram(chain_display[:, i], bins=50, density=True, weights=weights)
             fig.add_trace(go.Bar(x=(bins[:-1]+bins[1:])/2, y=hist, name=p, opacity=0.7))
             fig.update_layout(title=f"{p} marginal (weighted)", height=200, showlegend=False, template=plotly_template())
+            plot_export_controls(fig, f"reweight_marginal_{p}_{model}")
             st.plotly_chart(fig, use_container_width=True)
+        
+        # Export resampled chain if available
+        if "reweight_resampled" in st.session_state:
+            export_downloads(pd.DataFrame(chain_display, columns=param_names), f"reweight_resampled_{model}")
+        else:
+            export_downloads(pd.DataFrame(chain, columns=param_names), f"reweight_original_chain_{model}")

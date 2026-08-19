@@ -9,7 +9,7 @@ from pramana.core.nested_sampling import run_nested, equal_weight_posterior, bay
 from pramana.core.likelihood import log_likelihood
 from pramana.core.plotting import getdist_triangle
 from pramana.web.components.data_loader import pantheon_loader
-from pramana.web.components.ui import plotly_template
+from pramana.web.components.ui import plotly_template, plot_export_controls, export_downloads
 
 
 def render():
@@ -85,7 +85,9 @@ def render():
                     lnK, err = bayes_factor(results[m1], results[m2], m1.upper(), m2.upper())
                     bf_data.append({"Model A": m1.upper(), "Model B": m2.upper(), "ln(K)": f"{lnK:.2f} ± {err:.2f}"})
             if bf_data:
-                st.dataframe(pd.DataFrame(bf_data), use_container_width=True, hide_index=True)
+                bf_df = pd.DataFrame(bf_data)
+                st.dataframe(bf_df, use_container_width=True, hide_index=True)
+                export_downloads(bf_df, "model_comparison_bayes_factors")
 
         st.subheader("Posterior Comparison")
         # Triangle plot overlay
@@ -113,6 +115,23 @@ def render():
                 else:
                     cols[i+1].write("—")
 
+        # Export parameter constraints table
+        constraint_rows = []
+        for p in sorted(all_params):
+            row = {"Parameter": p}
+            for model, chain in chains.items():
+                pnames = param_names_dict[model]
+                if p in pnames:
+                    idx = pnames.index(p)
+                    med = np.median(chain[:, idx])
+                    lo, hi = np.percentile(chain[:, idx], [16, 84])
+                    row[model.upper()] = f"{med:.4f} (+{hi-med:.4f}/-{med-lo:.4f})"
+                else:
+                    row[model.upper()] = "—"
+            constraint_rows.append(row)
+        if constraint_rows:
+            export_downloads(pd.DataFrame(constraint_rows), "model_comparison_constraints")
+
         # 1D marginals overlay
         st.subheader("1D Marginal Overlays")
         for p in sorted(all_params):
@@ -125,4 +144,5 @@ def render():
                     fig.add_trace(go.Bar(x=(bins[:-1]+bins[1:])/2, y=hist, name=model.upper(), opacity=0.5))
             fig.update_layout(title=f"{p} marginal comparison", barmode="overlay",
                               height=300, template=plotly_template())
+            plot_export_controls(fig, f"model_comparison_marginal_{p}")
             st.plotly_chart(fig, use_container_width=True)

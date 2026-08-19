@@ -41,7 +41,7 @@ def validate_pantheon_cov(cov_path: str, n_data: int) -> dict:
 
 
 def validate_desi_bao_file(filepath: str) -> dict:
-    """Validate DESI BAO data file (if using custom file instead of built-in table)."""
+    """Validate DESI BAO data file (if using custom file instead of reference table)."""
     data = np.loadtxt(filepath)
     if data.ndim != 2 or data.shape[1] < 3:
         raise ValueError("DESI BAO file must have columns: z, observable, error")

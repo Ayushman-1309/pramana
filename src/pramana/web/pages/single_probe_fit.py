@@ -2,6 +2,7 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
+import pandas as pd
 from pramana.core.models import MODEL_REGISTRY
 from pramana.core.data_io import load_pantheon, make_synthetic_dataset
 from pramana.core.mcmc import run_fit as run_mcmc
@@ -13,7 +14,7 @@ from pramana.core.likelihood import log_likelihood
 from pramana.core.hmc_numpyro import build_sn_model, run_nuts, samples_to_flat_chain
 from pramana.core.sbi_inference import make_simulator, train_npe, sample_posterior
 from pramana.web.components.data_loader import pantheon_loader
-from pramana.web.components.ui import plotly_template
+from pramana.web.components.ui import plotly_template, plot_export_controls, export_downloads
 
 
 def render():
@@ -161,6 +162,10 @@ def render():
             lo, hi = np.percentile(chain[:, i], [16, 84])
             cols[i].metric(p, f"{med:.4f}", f"+{hi-med:.4f}/-{med-lo:.4f}")
 
+        # Export chain
+        chain_df = pd.DataFrame(chain, columns=param_names)
+        export_downloads(chain_df, f"chain_{model_name}_{method.replace(' ', '_').replace('(', '').replace(')', '')}")
+
         # Corner plot (static matplotlib)
         if st.button("Generate Corner Plot"):
             with st.spinner("Generating corner plot..."):
@@ -174,6 +179,7 @@ def render():
             hist, bins = np.histogram(chain[:, i], bins=50, density=True)
             fig.add_trace(go.Bar(x=(bins[:-1]+bins[1:])/2, y=hist, name=p, opacity=0.7))
             fig.update_layout(title=f"{p} marginal", height=200, showlegend=False, template=plotly_template())
+            plot_export_controls(fig, f"marginal_{p}_{model_name}")
             st.plotly_chart(fig, use_container_width=True)
 
     if "profile_result" in st.session_state:
@@ -186,4 +192,9 @@ def render():
         fig.add_vline(x=res["lo"], line_dash="dot", line_color="orange", annotation_text="68% CI")
         fig.add_vline(x=res["hi"], line_dash="dot", line_color="orange")
         fig.update_layout(xaxis_title=res["param"], yaxis_title="-log L", template=plotly_template())
+        plot_export_controls(fig, f"profile_{res['param']}_{model_name}")
         st.plotly_chart(fig, use_container_width=True)
+        
+        # Export profile data
+        profile_df = pd.DataFrame({"scan_vals": res["scan_vals"], "profile_nll": res["profile_nll"]})
+        export_downloads(profile_df, f"profile_{res['param']}_{model_name}")

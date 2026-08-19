@@ -7,7 +7,7 @@ def render():
     # Status bar at top
     render_status_bar()
     
-    st.title("PRAMANA — Unified Cosmological Inference Suite")
+    st.title("PRAMANA — The Unified Cosmological Inference Suite")
     st.markdown("""
     **Sanskrit *pramāṇa* (प्रमाण)**: a means of valid knowledge — the epistemological question of
     how you actually justify that something is true.
@@ -17,6 +17,7 @@ def render():
     - **BAO** (DESI DR2)
     - **CMB** (ACT DR6 lensing + primary)
     - **JWST-era probes** (high-z SNe, H₀ tension, S₈ tension)
+    - **Weak Lensing** (Euclid & Rubin/LSST cosmic shear)
 
     With multiple inference engines:
     - **MCMC** (emcee)
@@ -36,7 +37,7 @@ def render():
 
     with col1:
         st.metric("Models", "3", "ΛCDM, wCDM, CPL")
-        st.metric("Probes", "4", "SN, BAO, CMB, JWST")
+        st.metric("Probes", "5", "SN, BAO, CMB, JWST, WL")
         st.metric("Inference Methods", "9", "MCMC, Nested, NUTS, Profile, SBI, Fisher, GP, MOPED, Reweight")
 
     with col2:
@@ -55,9 +56,10 @@ pramana joint fit --model cpl --sn-data ... --sn-cov ... --bao
         st.markdown("### Key Features")
         st.markdown("""
         - **Validated pipelines** — cross-checked methods (MCMC vs NUTS, Fisher vs MCMC, etc.)
-        - **Real data** — DESI DR2 BAO table built-in, Pantheon+ loaders
+        - **No bundled observational data** — load real releases or generate synthetic mocks via the Data Hub
         - **Official CMB wrappers** — ACT DR6 via act_dr6_lenslike/act_dr6_cmbonly
         - **JWST tension** — H₀/S₈ whisker plots with latest measurements
+        - **Euclid & LSST ready** — weak lensing forward model (synthetic-validated)
         - **Web + CLI** — interactive UI and scriptable command line
         """)
 
@@ -66,7 +68,7 @@ pramana joint fit --model cpl --sn-data ... --sn-cov ... --bao
     st.markdown("""
     | Page | Purpose |
     |------|---------|
-    | **Data Explorer** | Load/validate Pantheon+, DESI BAO, view H₀/S₈ measurements |
+    | **Data Explorer** | Load/validate Pantheon+, DESI BAO, ACT CMB, JWST, Euclid/LSST shear |
     | **Single-Probe Fit** | Run MCMC/Nested/NUTS/Profile/SBI on SN data |
     | **Joint Fit** | Combined SN+BAO(+CMB) with per-probe χ² breakdown |
     | **Model Comparison** | Bayes factors, evidence, posterior overlays |
@@ -75,4 +77,5 @@ pramana joint fit --model cpl --sn-data ... --sn-cov ... --bao
     | **Importance Reweighting** | Reweight chains to new priors/data |
     | **MOPED Compression** | Optimal data compression |
     | **Tension Analysis** | H₀/S₈ whisker plots, append JWST high-z SNe |
+    | **About** | User manual, theory, developer info |
     """)

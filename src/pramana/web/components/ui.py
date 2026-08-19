@@ -1,10 +1,14 @@
-"""UI design tokens and helpers for PRAMANA v2.0.0."""
+"""UI design tokens and helpers for PRAMANA v2.1.0."""
 import streamlit as st
+import base64
+import io
+import pandas as pd
 
 
 # Version & attribution
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 DEVELOPER = "Ayushman"
+SUITE_NAME = "PRAMANA — The Unified Cosmological Inference Suite"
 
 # Color palette (scientific, not commercial)
 # Near-black background, muted spectral-blue accent, thin gray borders
@@ -344,10 +348,36 @@ def render_status_bar() -> None:
         probes.append(f'<span class="pr-status-item"><span class="pr-status-dot loaded"></span>Pantheon+ ({n} SNe)</span>')
     else:
         probes.append('<span class="pr-status-item"><span class="pr-status-dot missing"></span>Pantheon+ (not loaded)</span>')
-    # DESI (built-in)
-    probes.append('<span class="pr-status-item"><span class="pr-status-dot loaded"></span>DESI DR2 (built-in)</span>')
+    # DESI DR2
+    if "bao_data" in st.session_state:
+        src = st.session_state["bao_data"].get("source", "?")
+        n = len(st.session_state["bao_data"]["data"])
+        probes.append(f'<span class="pr-status-item"><span class="pr-status-dot loaded"></span>DESI DR2 ({n} pts, {src})</span>')
+    else:
+        probes.append('<span class="pr-status-item"><span class="pr-status-dot missing"></span>DESI DR2 (not loaded)</span>')
     # ACT
-    probes.append('<span class="pr-status-item"><span class="pr-status-dot neutral"></span>ACT DR6 (not loaded)</span>')
+    if "cmb_data" in st.session_state:
+        probes.append('<span class="pr-status-item"><span class="pr-status-dot loaded"></span>ACT DR6 (loaded)</span>')
+    else:
+        probes.append('<span class="pr-status-item"><span class="pr-status-dot neutral"></span>ACT DR6 (not loaded)</span>')
+    # JWST-era
+    if "jwst_data" in st.session_state:
+        d = st.session_state["jwst_data"]
+        n_h0 = len(d.get("h0_table", {}))
+        n_s8 = len(d.get("s8_table", {}))
+        n_hz = len(d.get("highz_sn", {}).get("z", []))
+        src = d.get("source", "?")
+        probes.append(f'<span class="pr-status-item"><span class="pr-status-dot loaded"></span>JWST-era (H0:{n_h0} S8:{n_s8} Hz:{n_hz}, {src})</span>')
+    else:
+        probes.append('<span class="pr-status-item"><span class="pr-status-dot neutral"></span>JWST-era (not loaded)</span>')
+    # Weak Lensing (Euclid/LSST)
+    if "shear_data" in st.session_state:
+        d = st.session_state["shear_data"]
+        n_pairs = len(d.get("pairs", []))
+        preset = d.get("preset", "?")
+        probes.append(f'<span class="pr-status-item"><span class="pr-status-dot loaded"></span>WL ({preset}, {n_pairs} pairs)</span>')
+    else:
+        probes.append('<span class="pr-status-item"><span class="pr-status-dot neutral"></span>WL (not loaded)</span>')
     
     model = st.session_state.get("active_model", "—")
     
@@ -404,9 +434,74 @@ def render_footer() -> None:
     """Render the fixed footer with version and developer credit."""
     st.markdown(f"""
     <div class="pr-footer">
-        PRAMANA v{VERSION} · Developed by {DEVELOPER} ·
+        {SUITE_NAME} v{VERSION} · Developed by {DEVELOPER} ·
+        <a href="https://github.com/Ayushman-1309/pramana.git" target="_blank">GitHub</a> ·
         <a href="https://github.com/PantheonPlusSH0ES/DataRelease" target="_blank">Pantheon+SH0ES</a> ·
         <a href="https://www.desi.lbl.gov/" target="_blank">DESI DR2</a> ·
-        <a href="https://lambda.gsfc.nasa.gov/" target="_blank">ACT DR6</a>
+        <a href="https://lambda.gsfc.nasa.gov/" target="_blank">ACT DR6</a> ·
+        <a href="https://www.euclid-ec.org/" target="_blank">Euclid</a> ·
+        <a href="https://www.lsst.org/" target="_blank">Rubin/LSST</a>
     </div>
     """, unsafe_allow_html=True)
+
+
+def plot_export_controls(fig, basename: str) -> None:
+    """
+    Render export controls for a Plotly figure: log-x, log-y toggles and
+    PNG/SVG/PDF download buttons (via kaleido).
+    """
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
+    with col1:
+        xlog = st.checkbox("Log X", value=False, key=f"{basename}_xlog")
+    with col2:
+        ylog = st.checkbox("Log Y", value=False, key=f"{basename}_ylog")
+    with col3:
+        fmt = st.selectbox("Format", ["png", "svg", "pdf"], key=f"{basename}_fmt")
+    with col4:
+        scale = st.select_slider("Scale", [1, 2, 3], value=2, key=f"{basename}_scale")
+    
+    if xlog:
+        fig.update_xaxes(type="log")
+    if ylog:
+        fig.update_yaxes(type="log")
+    
+    buf = io.BytesIO()
+    fig.write_image(buf, format=fmt, scale=scale)
+    buf.seek(0)
+    mime = {"png": "image/png", "svg": "image/svg+xml", "pdf": "application/pdf"}[fmt]
+    st.download_button(
+        label=f"⬇ {fmt.upper()}",
+        data=buf,
+        file_name=f"{basename}.{fmt}",
+        mime=mime,
+        key=f"{basename}_dl",
+        use_container_width=True,
+    )
+
+
+def export_downloads(df, basename: str) -> None:
+    """
+    Render CSV and Excel (XLSX) download buttons for a DataFrame.
+    """
+    col1, col2 = st.columns(2)
+    csv_bytes = df.to_csv(index=False).encode()
+    col1.download_button(
+        "⬇ CSV",
+        data=csv_bytes,
+        file_name=f"{basename}.csv",
+        mime="text/csv",
+        key=f"{basename}_csv",
+        use_container_width=True,
+    )
+    xlsx_buf = io.BytesIO()
+    with pd.ExcelWriter(xlsx_buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Data")
+    xlsx_buf.seek(0)
+    col2.download_button(
+        "⬇ Excel",
+        data=xlsx_buf,
+        file_name=f"{basename}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key=f"{basename}_xlsx",
+        use_container_width=True,
+    )

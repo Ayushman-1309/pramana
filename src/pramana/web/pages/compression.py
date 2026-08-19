@@ -6,7 +6,7 @@ import pandas as pd
 from pramana.core.models import MODEL_REGISTRY
 from pramana.core.data_compression import moped_vectors, compress, compressed_log_likelihood
 from pramana.web.components.data_loader import pantheon_loader
-from pramana.web.components.ui import plotly_template, render_status_bar
+from pramana.web.components.ui import plotly_template, render_status_bar, plot_export_controls, export_downloads
 
 
 def render():
@@ -74,11 +74,13 @@ def render():
             st.subheader("MOPED Vectors (B matrix)")
             B_df = pd.DataFrame(B, index=[f"y_{i}" for i in range(len(z))], columns=param_names)
             st.dataframe(B_df, use_container_width=True)
+            export_downloads(B_df, f"moped_B_matrix_{model}")
             
             # Show compressed data
             st.subheader("Compressed Data")
             comp_df = pd.DataFrame({"Parameter": param_names, "Compressed y": y_compressed})
             st.dataframe(comp_df, use_container_width=True, hide_index=True)
+            export_downloads(comp_df, f"moped_compressed_data_{model}")
 
     # Validation
     if "moped_B" in st.session_state:
@@ -141,7 +143,12 @@ def render():
                     xaxis_title="|Δ log L|", yaxis_title="Count",
                     template=plotly_template(), height=300
                 )
+                plot_export_controls(fig, f"moped_validation_{model}")
                 st.plotly_chart(fig, use_container_width=True)
+                
+                # Export validation data
+                val_df = pd.DataFrame({"diff_logL": diffs})
+                export_downloads(val_df, f"moped_validation_{model}")
                 
                 # Overall assessment
                 if diffs.max() < 0.1:
@@ -193,6 +200,10 @@ def render():
                 med = np.median(chain[:, i])
                 lo, hi = np.percentile(chain[:, i], [16, 84])
                 cols[i].metric(p, f"{med:.4f}", f"+{hi-med:.4f}/-{med-lo:.4f}")
+            
+            # Export compressed chain
+            chain_df = pd.DataFrame(chain, columns=param_names)
+            export_downloads(chain_df, f"moped_chain_{model}")
 
             # Compare with full likelihood if available
             if "last_chain" in st.session_state and st.session_state.get("last_model") == model:
@@ -209,4 +220,6 @@ def render():
                         "Full": f"{med_full:.4f}",
                         "Diff": f"{abs(med_comp - med_full):.4f}"
                     })
-                st.dataframe(pd.DataFrame(comp_data), use_container_width=True, hide_index=True)
+                comp_df = pd.DataFrame(comp_data)
+                st.dataframe(comp_df, use_container_width=True, hide_index=True)
+                export_downloads(comp_df, f"moped_comparison_{model}")

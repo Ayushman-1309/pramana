@@ -40,6 +40,8 @@ dependencies = [
     "typer>=0.12",
     "rich>=13.7",
     "pydantic>=2.7",
+    "openpyxl>=3.1",
+    "kaleido>=0.2.1",
 ]
 
 [project.optional-dependencies]
@@ -91,3 +93,8 @@ omit = ["tests/*", "*/__pycache__/*"]
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "def __repr__", "raise AssertionError", "raise NotImplementedError"]
 precision = 2
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

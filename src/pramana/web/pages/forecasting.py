@@ -10,7 +10,7 @@ from pramana.core.fisher_forecast import (
     fisher_ellipse, compare_to_mcmc
 )
 from pramana.web.components.data_loader import pantheon_loader
-from pramana.web.components.ui import plotly_template, render_status_bar
+from pramana.web.components.ui import plotly_template, render_status_bar, plot_export_controls, export_downloads
 
 
 def render():
@@ -79,7 +79,9 @@ def render():
         err_data = []
         for p in param_names:
             err_data.append({"Parameter": p, "σ (Fisher)": f"{errs[p]:.4g}"})
-        st.dataframe(pd.DataFrame(err_data), use_container_width=True, hide_index=True)
+        err_df = pd.DataFrame(err_data)
+        st.dataframe(err_df, use_container_width=True, hide_index=True)
+        export_downloads(err_df, f"fisher_errors_{param_names[0]}_{param_names[-1] if len(param_names)>1 else ''}")
 
         # Fisher ellipse
         st.subheader("Fisher Confidence Ellipses")
@@ -100,6 +102,7 @@ def render():
                 fig.update_layout(xaxis_title=p_i, yaxis_title=p_j,
                                   title=f"Fisher 1σ Ellipse: {p_i} vs {p_j}",
                                   template=plotly_template(), height=400)
+                plot_export_controls(fig, f"fisher_ellipse_{p_i}_vs_{p_j}")
                 st.plotly_chart(fig, use_container_width=True)
 
         # Compare to MCMC
@@ -124,7 +127,9 @@ def render():
                             "MCMC σ": f"{mcmc_err:.4g}",
                             "Ratio (F/M)": f"{ratio:.2f}"
                         })
-                    st.dataframe(pd.DataFrame(comp_data), use_container_width=True, hide_index=True)
+                    comp_df = pd.DataFrame(comp_data)
+                    st.dataframe(comp_df, use_container_width=True, hide_index=True)
+                    export_downloads(comp_df, f"fisher_mcmc_comparison_{param_names[0]}")
                     
                     # Flag non-Gaussianity
                     for name, f_err, mcmc_err, ratio in comp_results:

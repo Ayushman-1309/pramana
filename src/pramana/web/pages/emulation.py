@@ -7,7 +7,7 @@ from pramana.core.models import MODEL_REGISTRY
 from pramana.core.data_io import load_pantheon, make_synthetic_dataset
 from pramana.core.gp_emulator import latin_hypercube_design, train_emulator, emulate, validate_emulator
 from pramana.web.components.data_loader import pantheon_loader
-from pramana.web.components.ui import plotly_template
+from pramana.web.components.ui import plotly_template, plot_export_controls
 
 
 def render():
@@ -101,6 +101,7 @@ def render():
             fig.add_trace(go.Scatter(x=z, y=y_pred + y_std, mode="lines", name="+1σ", line=dict(color="#ff7f0e", width=0), showlegend=False))
             fig.add_trace(go.Scatter(x=z, y=y_pred - y_std, mode="lines", name="-1σ", line=dict(color="#ff7f0e", width=0), fill="tonexty", fillcolor="rgba(255,127,14,0.1)", showlegend=False))
             fig.update_layout(xaxis_title="z", yaxis_title="μ(z)", template=plotly_template(), height=400)
+            plot_export_controls(fig, f"emulation_prediction_{model}")
             st.plotly_chart(fig, use_container_width=True)
 
             # Show numeric results
